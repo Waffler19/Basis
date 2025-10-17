@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import math
 
 class Basis():
-    def __init__(self, orbital, number_of_gaussians=3, rmax=5, r_inc = 0.05, p_thresh = 0.2, plot_type='radial'):
+    def __init__(self, orbital, number_of_gaussians=3, rmax=5, r_inc = 0.05, p_thresh = 0.2, plot_type='radial', stats=False):
         '''Create A Basis Set Object
         Kwargs:
             orbital : String
@@ -28,8 +28,9 @@ class Basis():
         self.r_inc = r_inc
         self.p_thresh = p_thresh
         self.plot_type = plot_type
-
-
+        self.stats = stats
+        self.log = []
+    
     def kernel(self):
         '''Kernel ==> Calculate STO-NG approximation for Hydrogen Atom Orbitals'''
         r, psi, psi_2, psi_rad = self.generate_correct_function(self.orbital) #generate H atom function'
@@ -43,15 +44,28 @@ class Basis():
         if self.number_of_gaussians == 3:
             popt, pcov = curve_fit(self.model_function_3g, r, psi, p0=[1.2, 0.4, 1.3, 0.33, 0.33, 0.33])
             p = self.model_function_3g(r, *popt)
+
         if self.number_of_gaussians == 6:
             popt, pcov = curve_fit(self.model_function_6g, r, psi, p0=[1,1,1,1,1,1])
             p = self.model_function_6g(r, *popt)
-        overlap_int = self.overlap(r, p, psi)
+        p, psi = self.normalize(r, p, psi) #Normalize p, psi
+        overlap_int = self.overlap(r, p, psi) #Compute int(pxpsi dr)
+        if self.stats:
+            expect_psi, expect_p = self.expectation_r(r,p,psi)
+            f = self.convert_to_functions(popt)
+            print(f)
+        self.psi = psi
+        self.p = p
+        self.r = r
         if self.plot_type == 'Polar':
             self.to_polar(r, p, psi)
+        elif self.plot_type=='Radial':
+            if self.stats:
+                self.plot(r, p, psi, overlap_int, expect_psi, expect_p)
+            else:
+                self.plot(r, p, psi, overlap_int)
         else:
-            self.plot(r, p, psi, overlap_int)
-
+            return
     
     def model_function_1g(self, r, alphai, ci):
         '''Model STO-1G'''
@@ -110,7 +124,6 @@ class Basis():
 
     def generate_correct_function(self, orbital, r=0):
         '''Generate Correct Hydrogen Atom Functions (Spherical Harmonics for Different Orbitals)'''
-        n = int(orbital[0])
         r_list = [] #list of radius for graphing
         psi_list = [] #psi for graphing
         psi_2_list = [] #psi**2 for prob
@@ -147,33 +160,47 @@ class Basis():
             r += self.r_inc
         return np.array(r_list), np.array(psi_list), np.array(psi_2_list), np.array(psi_2_r_2)
     
-    def convert_to_functions(self, coefficients, orbital, angular_momentum, orientation=None):
+    def convert_to_functions(self, coefficients):
         '''Convert STO-3G Generated Function to a Readable String'''
-        ci = str(round(coefficients[1],3))
-        cj = str(round(coefficients[3], 3))
-        ck = str(round(coefficients[5], 3))
-        alphai = str(round(-coefficients[0], 3))
-        alphaj = str(round(-coefficients[2], 3))
-        alphak = str(round(-coefficients[4], 3))    
-        if angular_momentum == 0:
-            f_x_y_z = ci+'*e^('+alphai+'*(x^2+y^2+z^2))  + ' + cj+'*e^('+alphaj+'*(x^2+y^2+z^2)) + ' + ck+'*e^('+alphak+'*(x^2+y^2+z^2))'
-        return f_x_y_z
-    
-    def overlap(self, r, p, psi):
+        coefficients = coefficients.tolist()
+        f = r"$\Psi_{\text{GTO}} = "   
+        for i in range(0, len(coefficients), 2):
+            c = str(round(coefficients[i],3))
+            alpha = str(round(coefficients[i+1], 3))
+            print(alpha)
+            f+=f"{c}e^{{-{alpha}(r^2)}}"
+            if i < len(coefficients)-2:
+                f += ' + '
+        f += '$'
+        print(f)
+        return f
+
+    def normalize(self,r,  p, psi):
         normalize_psi = math.sqrt(1/np.trapz(psi*psi, r))
         psi = psi*normalize_psi
         normalize_p = math.sqrt(1/np.trapz(p*p, r))
         p = p*normalize_p
+        return p, psi
+    
+    def overlap(self, r, p, psi):
         return np.trapz(p*psi, r)
-    def plot(self, r, p, psi, overlap):
+    
+    def expectation_r(self, r, p, psi):
+        return np.trapz(r*psi**2, r), np.trapz(r*p**2, r)
+    
+    def plot(self, r, p, psi, overlap, psi_e=0, p_e=0):
             '''Plot in R vs Psi Space'''
             plt.plot(r,psi, label='Hydrogen Atom Wavefunction: ' + self.orbital)
             plt.plot(r, p, 'g--', label='STO-'+str(self.number_of_gaussians)+'g')
             plt.text(0.6 * max(r),  0.8 * max(psi), rf'$\langle \psi_{{\mathrm{{GTO}}}} | \psi_{{\mathrm{{STO}}}} \rangle = {overlap:.3f}$', fontsize=12, bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+            if self.stats:
+                plt.axvline(x=psi_e, linestyle='-')
+                plt.axvline(x=p_e, linestyle='--', color='green')
             plt.xlabel('r (Angstrom)', fontsize=12)
             plt.ylabel(rf'$\psi(r)$', fontsize=15)
             plt.legend()
             plt.show()
+
     def plot_polar(self, r=None, theta=None, theta_p=None, r_p=None, p=None, psi=None):
         '''Plot in R vs Theta Space with Psi as Shading'''
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
@@ -184,3 +211,5 @@ class Basis():
         plt.legend()
         plt.show()
 
+k = Basis('3pz', number_of_gaussians=1, p_thresh=0.01, plot_type='Radial', r_inc=0.05, rmax=6, stats=True)
+k.kernel()
