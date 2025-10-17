@@ -42,3 +42,8 @@ Radial:
 Example 2pz:
 
 ![Radial 2pz WaveFunction](Figure_1.png)
+
+## Installation
+Ensure your python version is updated!
+
+git clone https://github.com/Waffler19/Basis.git 
