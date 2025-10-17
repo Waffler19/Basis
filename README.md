@@ -5,8 +5,7 @@
 This program allows for generation visualization of the following Hydrogenic and STO-nG Orbitals:
 1s, 2s, 2pz, 3s, 3pz, 3dz in the polar (r, theta, psi) and radial (r, psi) space. 
 
-STO-nG orbitals are generated using a linear regression algorithm to optimize coefficients in the linear combination of Gaussians.
-The in 'Radial' mode program will calculate and display numerical overlap integrals between STO-nG orbitals and Hydrogenic Orbitals
+STO-nG orbitals are generated using a linear regression algorithm to optimize coefficients in the linear combination of Gaussians. In 'Radial' mode the program will calculate and display numerical overlap integrals between STO-nG orbitals and Hydrogenic Orbitals
 
 ## Input Parameters
 
